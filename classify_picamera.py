@@ -95,9 +95,9 @@ def main():
         tempDict[str(label_id)] +=1
         if(count == 10):
           tempMax = max(tempDict.items())
-          for key,value in tempDict:
-            if value == tempMax:
-              canSend(int(key))
+          for index in tempDict.keys():
+            if (tempDict[index] == tempMax):
+              canSend(int(index))
           count = 0
           tempDict = {"1":0,"2":0,"3":0,"4":0}
         ################### LABEL_ID   0,1,2,3,4 --> 40limit, 40-nolimit, cross, stop, zbackground    
@@ -113,15 +113,15 @@ def main():
 
 def canSend(label_id):
   messageCAN = [0,0,0,0,0,0,0,0]
-  if(label_id != prev_label_id):
-    messageCAN[2] = label_id
-    bus = can.interface.Bus(bustype='socketcan',
-                          channel='can0',
-                          bitrate=500000)
-    #CAN ID 0x2A = 42
-    message = can.Message(arbitration_id=42, data=messageCAN)
-    bus.send(message)
-    prev_label_id = label_id
-    time.sleep(1)
+  #if(label_id != prev_label_id):
+  messageCAN[2] = label_id
+  bus = can.interface.Bus(bustype='socketcan',
+                        channel='can0',
+                        bitrate=500000)
+  #CAN ID 0x2A = 42
+  message = can.Message(arbitration_id=42, data=messageCAN)
+  bus.send(message)
+  prev_label_id = label_id
+  time.sleep(1)
 if __name__ == '__main__':
   main()
