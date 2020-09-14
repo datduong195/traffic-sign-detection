@@ -24,10 +24,9 @@ import io
 import time
 import numpy as np
 import picamera
-
+import can
 from PIL import Image
 from tflite_runtime.interpreter import Interpreter
-
 
 def load_labels(path):
   with open(path, 'r') as f:
@@ -57,6 +56,8 @@ def classify_image(interpreter, image, top_k=1):
 
 
 def main():
+  global prev_label_id
+  tempDict = {"1":0,"2":0,"3":0,"4":0}
   parser = argparse.ArgumentParser(
       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   parser.add_argument(
@@ -73,11 +74,11 @@ def main():
   
   print(height,width)
   frame = 0
-
   with picamera.PiCamera(resolution=(640, 320), framerate=30) as camera:    ### (640,480) -> (640,320)
     camera.start_preview()
     try:
       stream = io.BytesIO()
+      count = 0
       for _ in camera.capture_continuous(
           stream, format='jpeg', use_video_port=True):
         stream.seek(0)
@@ -91,17 +92,36 @@ def main():
         label_id, prob = results[0]
         if prob < 0.5:
             label_id = 4
-            
+        tempDict[str(label_id)] +=1
+        if(count == 10):
+          tempMax = max(tempDict.items())
+          for key,value in tempDict:
+            if value == tempMax:
+              canSend(int(key))
+          count = 0
+          tempDict = {"1":0,"2":0,"3":0,"4":0}
         ################### LABEL_ID   0,1,2,3,4 --> 40limit, 40-nolimit, cross, stop, zbackground    
-            
+        
         print(labels[label_id], label_id, prob,elapsed_ms)
         stream.seek(0)
         stream.truncate()
         camera.annotate_text = '%s %d %.2f\n%.1fms' % (labels[label_id], label_id, prob,
                                                     elapsed_ms)
+        count+=1
     finally:
       camera.stop_preview()
 
-
+def canSend(label_id):
+  messageCAN = [0,0,0,0,0,0,0,0]
+  if(label_id != prev_label_id):
+    messageCAN[2] = label_id
+    bus = can.interface.Bus(bustype='socketcan',
+                          channel='can0',
+                          bitrate=500000)
+    #CAN ID 0x2A = 42
+    message = can.Message(arbitration_id=42, data=messageCAN)
+    bus.send(message)
+    prev_label_id = label_id
+    time.sleep(1)
 if __name__ == '__main__':
   main()
